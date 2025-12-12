@@ -1,0 +1,4 @@
+node_modules/
+glue-config.json
+*.log
+.env

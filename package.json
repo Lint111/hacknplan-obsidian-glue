@@ -1,0 +1,25 @@
+{
+  "name": "hacknplan-obsidian-glue",
+  "version": "1.0.0",
+  "description": "MCP server that syncs HacknPlan and Obsidian vault documentation",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "hacknplan-obsidian-glue": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "keywords": [
+    "mcp",
+    "hacknplan",
+    "obsidian",
+    "sync",
+    "project-management"
+  ],
+  "author": "",
+  "license": "MIT"
+}

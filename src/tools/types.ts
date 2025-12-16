@@ -4,6 +4,7 @@
 
 import type { Pairing, FileSyncState } from '../core/types.js';
 import type { HacknPlanClient } from '../core/client.js';
+import type { FileWatcher } from '../lib/file-watcher.js';
 
 /**
  * Sync state operations exposed to tools
@@ -17,9 +18,23 @@ export interface SyncStateOps {
 }
 
 /**
- * Tool handler context - provides access to pairing management and sync state
+ * Pairing store operations exposed to tools
+ */
+export interface PairingStore {
+  get: (projectId: number) => Pairing | undefined;
+  getByVault: (vaultPath: string) => Pairing | undefined;
+  getAll: () => Pairing[];
+  add: (pairing: Pairing) => void;
+  remove: (projectId: number) => boolean;
+  update: (projectId: number, updates: Partial<Pairing>) => Pairing | null;
+  save: () => void;
+}
+
+/**
+ * Tool handler context - provides access to pairing management, sync state, and file watcher
  */
 export interface ToolContext {
+  // Pairing operations
   getPairing: (projectId: number) => Pairing | undefined;
   getPairingByVault: (vaultPath: string) => Pairing | undefined;
   getAllPairings: () => Pairing[];
@@ -27,10 +42,14 @@ export interface ToolContext {
   removePairing: (projectId: number) => boolean;
   updatePairing: (projectId: number, updates: Partial<Pairing>) => Pairing | null;
   saveConfig: () => void;
+  // Pairing store (Phase 6 - cleaner interface)
+  pairingStore: PairingStore;
   // Sync state operations (Phase 3)
   syncState: SyncStateOps;
   // HacknPlan API client (Phase 5)
   hacknplanClient: HacknPlanClient | null;
+  // File watcher (Phase 6)
+  fileWatcher: FileWatcher;
 }
 
 /**

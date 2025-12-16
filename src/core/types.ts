@@ -243,46 +243,6 @@ export interface TagMappingResult {
 
 // ============ TOOL TYPES ============
 
-/**
- * Tool handler context - provides access to all services
- */
-export interface ToolContext {
-  getPairing: (projectId: number) => Pairing | undefined;
-  getPairingByVault: (vaultPath: string) => Pairing | undefined;
-  getAllPairings: () => Pairing[];
-  addPairing: (pairing: Pairing) => void;
-  removePairing: (projectId: number) => boolean;
-  updatePairing: (projectId: number, updates: Partial<Pairing>) => Pairing | null;
-  saveConfig: () => void;
-}
-
-/**
- * Tool handler function signature
- */
-export type ToolHandler<TArgs = unknown, TResult = unknown> = (
-  args: TArgs,
-  context: ToolContext
-) => Promise<TResult>;
-
-/**
- * Tool definition with handler
- */
-export interface ToolDefinition<TArgs = unknown, TResult = unknown> {
-  name: string;
-  description: string;
-  inputSchema: {
-    type: 'object';
-    properties: Record<string, unknown>;
-    required?: string[];
-  };
-  handler: ToolHandler<TArgs, TResult>;
-}
-
-/**
- * Tool registry - maps tool names to handlers
- */
-export type ToolRegistry = Map<string, ToolDefinition>;
-
 // ============ CONFLICT TYPES ============
 
 /**

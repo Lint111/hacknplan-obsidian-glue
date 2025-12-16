@@ -16,12 +16,16 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.3",
+    "chokidar": "^5.0.0",
     "diff": "^8.0.2",
     "gray-matter": "^4.0.3",
+    "lodash.debounce": "^4.0.8",
     "p-limit": "^6.1.0"
   },
   "devDependencies": {
+    "@types/chokidar": "^1.7.5",
     "@types/diff": "^7.0.2",
+    "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^22.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0"

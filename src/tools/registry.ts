@@ -10,6 +10,7 @@ import { pairingTools } from './pairing.js';
 import { vaultTools } from './vault.js';
 import { syncTools } from './sync.js';
 import { crossReferenceTools } from './cross-reference.js';
+import { startFileWatcherTool, stopFileWatcherTool, getSyncStatusTool } from './file-watcher.js';
 
 /**
  * Create tool registry from tool definitions with duplicate detection.
@@ -84,7 +85,7 @@ export async function executeTool<TResult = unknown>(
 /**
  * Create global tool registry by combining all tool modules.
  *
- * Aggregates tools from all domain modules (pairing, vault, sync, cross-reference)
+ * Aggregates tools from all domain modules (pairing, vault, sync, cross-reference, file-watcher)
  * into a single unified registry.
  *
  * @returns Complete tool registry with all MCP tools
@@ -95,5 +96,8 @@ export function createGlobalRegistry(): ToolRegistry {
     ...vaultTools,
     ...syncTools,
     ...crossReferenceTools,
+    startFileWatcherTool,
+    stopFileWatcherTool,
+    getSyncStatusTool,
   ]);
 }

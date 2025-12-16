@@ -27,6 +27,7 @@ import { basename, dirname } from 'path';
 import { getConfigPath, createPairingManager } from './core/config.js';
 import { SyncStateManager } from './lib/sync-state.js';
 import { HacknPlanClient } from './core/client.js';
+import { FileWatcher } from './lib/file-watcher.js';
 import type { ToolContext } from './tools/types.js';
 import { createGlobalRegistry, getToolSchemas, executeTool } from './tools/registry.js';
 
@@ -53,10 +54,42 @@ if (hacknplanClient) {
   console.error('[glue] Warning: HACKNPLAN_API_KEY not set - sync execution disabled');
 }
 
+
+// ============ FILE WATCHER (Phase 6) ============
+
+const fileWatcher = new FileWatcher();
+
+// Listen to file watcher events
+fileWatcher.on('started', (data) => {
+  console.error(`[glue] File watcher started for ${data.vaultPath}`);
+});
+
+fileWatcher.on('ready', (data) => {
+  console.error(`[glue] File watcher ready - watching ${data.filesWatched} files`);
+});
+
+fileWatcher.on('stopped', () => {
+  console.error('[glue] File watcher stopped');
+});
+
+fileWatcher.on('change-detected', (change) => {
+  console.error(`[glue] Change detected: ${change.event} ${change.path}`);
+});
+
+fileWatcher.on('changes-ready', (changes) => {
+  console.error(`[glue] Processing ${changes.length} debounced change(s)`);
+  // TODO: Phase 7 - Trigger sync queue here
+});
+
+fileWatcher.on('error', (error) => {
+  console.error(`[glue] File watcher error: ${error.message}`);
+});
+
 // ============ TOOL CONTEXT ============
 
 function createToolContext(): ToolContext {
   return {
+    // Legacy pairing operations (for backward compatibility)
     getPairing: pairingManager.getPairing.bind(pairingManager),
     getPairingByVault: pairingManager.getPairingByVault.bind(pairingManager),
     getAllPairings: pairingManager.getAllPairings.bind(pairingManager),
@@ -64,6 +97,16 @@ function createToolContext(): ToolContext {
     removePairing: pairingManager.removePairing.bind(pairingManager),
     updatePairing: pairingManager.updatePairing.bind(pairingManager),
     saveConfig: pairingManager.saveConfig.bind(pairingManager),
+    // Pairing store (Phase 6 - cleaner interface)
+    pairingStore: {
+      get: pairingManager.getPairing.bind(pairingManager),
+      getByVault: pairingManager.getPairingByVault.bind(pairingManager),
+      getAll: pairingManager.getAllPairings.bind(pairingManager),
+      add: pairingManager.addPairing.bind(pairingManager),
+      remove: pairingManager.removePairing.bind(pairingManager),
+      update: pairingManager.updatePairing.bind(pairingManager),
+      save: pairingManager.saveConfig.bind(pairingManager),
+    },
     // Sync state operations (Phase 3)
     syncState: {
       getSyncState: syncStateManager.getSyncState.bind(syncStateManager),
@@ -74,6 +117,8 @@ function createToolContext(): ToolContext {
     },
     // HacknPlan API client (Phase 5)
     hacknplanClient,
+    // File watcher (Phase 6)
+    fileWatcher,
   };
 }
 
@@ -164,6 +209,13 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   console.error(`[glue] ${signal} received, saving state...`);
   try {
+    // Stop file watcher if running
+    if (fileWatcher.isWatching()) {
+      console.error('[glue] Stopping file watcher...');
+      await fileWatcher.stop();
+    }
+    
+    // Save sync state if dirty
     if (syncStateManager.isDirty()) {
       await syncStateManager.save();
     }
@@ -188,13 +240,14 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   console.error('[glue] HacknPlan-Obsidian Glue MCP v2.0.0 running');
-  console.error('[glue] TypeScript implementation - Phase 5 (Execute Real Sync)');
+  console.error('[glue] TypeScript implementation - Phase 6 (File Watcher)');
   console.error(`[glue] Config: ${CONFIG_PATH}`);
   console.error(`[glue] Sync state: ${syncStateManager.getStateFilePath()}`);
   console.error(`[glue] Pairings: ${pairingManager.getAllPairings().length}`);
   console.error(`[glue] Sync entries: ${syncStateManager.getEntryCount()}`);
   console.error(`[glue] Tools: ${toolRegistry.size}`);
   console.error(`[glue] HacknPlan client: ${hacknplanClient ? 'enabled' : 'disabled (no API key)'}`);
+  console.error(`[glue] File watcher: ready`);
 }
 
 main().catch((error) => {

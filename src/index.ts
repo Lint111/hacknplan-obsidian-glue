@@ -309,7 +309,7 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   console.error('[glue] HacknPlan-Obsidian Glue MCP v2.0.0 running');
-  console.error('[glue] TypeScript implementation - Phase 7 (Sync Queue)');
+  console.error('[glue] TypeScript implementation - Phase 8 (Single-File Sync)');
   console.error(`[glue] Config: ${CONFIG_PATH}`);
   console.error(`[glue] Sync state: ${syncStateManager.getStateFilePath()}`);
   console.error(`[glue] Pairings: ${pairingManager.getAllPairings().length}`);

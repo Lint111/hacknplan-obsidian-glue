@@ -159,25 +159,19 @@ export class SyncQueue extends EventEmitter {
       this.emit('item-processing', { id: item.id, retries: item.retries });
 
       // Execute sync operation
-      // Note: For Phase 7, we trigger a full vault sync
-      // Phase 8 will optimize to single-file sync
-      const { generateVaultToHacknPlanOps } = await import('./sync.js');
-      const { executeSyncBatch } = await import('./sync-executor.js');
+      // Phase 8: Single-file sync optimization
+      const { syncSingleFile } = await import('./single-file-sync.js');
 
-      const operations = await generateVaultToHacknPlanOps(item.pairing);
-      
-      const result = await executeSyncBatch(
-        operations.create,
-        operations.update,
-        item.pairing.projectId,
+      const result = await syncSingleFile(
+        item.change.path,
+        item.pairing,
         this.hacknplanClient,
-        this.syncState,
-        { stopOnError: true, rollbackOnError: true }
+        this.syncState
       );
 
       // Check for errors
-      if (result.errors.length > 0) {
-        throw new Error(result.errors[0].error);
+      if (!result.success) {
+        throw new Error(result.error || 'Sync failed');
       }
 
       // Success

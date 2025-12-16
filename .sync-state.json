@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "savedAt": "2025-12-16T20:08:03.867Z",
+  "state": {
+    "test/file.md": {
+      "lastSynced": "2025-12-16T20:08:03.866Z",
+      "vaultMtime": 1765915683866,
+      "hacknplanUpdatedAt": "2024-01-01T00:00:00Z",
+      "hacknplanId": 123
+    }
+  }
+}

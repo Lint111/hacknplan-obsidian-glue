@@ -1,4 +1,8 @@
 node_modules/
+dist/
 glue-config.json
 *.log
 .env
+
+# TypeScript
+*.tsbuildinfo

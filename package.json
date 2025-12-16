@@ -1,17 +1,30 @@
 {
   "name": "hacknplan-obsidian-glue",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "MCP server that syncs HacknPlan and Obsidian vault documentation",
   "type": "module",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "hacknplan-obsidian-glue": "./src/index.js"
+    "hacknplan-obsidian-glue": "./dist/index.js"
   },
   "scripts": {
-    "start": "node src/index.js"
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "npm run build && node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.3"
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "diff": "^8.0.2",
+    "gray-matter": "^4.0.3",
+    "p-limit": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
   },
   "keywords": [
     "mcp",

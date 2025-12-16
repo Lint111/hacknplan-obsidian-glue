@@ -11,6 +11,7 @@ import { vaultTools } from './vault.js';
 import { syncTools } from './sync.js';
 import { crossReferenceTools } from './cross-reference.js';
 import { startFileWatcherTool, stopFileWatcherTool, getSyncStatusTool } from './file-watcher.js';
+import { queueTools } from './queue.js';
 
 /**
  * Create tool registry from tool definitions with duplicate detection.
@@ -99,5 +100,6 @@ export function createGlobalRegistry(): ToolRegistry {
     startFileWatcherTool,
     stopFileWatcherTool,
     getSyncStatusTool,
+    ...queueTools,
   ]);
 }

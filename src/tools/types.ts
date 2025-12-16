@@ -5,6 +5,7 @@
 import type { Pairing, FileSyncState } from '../core/types.js';
 import type { HacknPlanClient } from '../core/client.js';
 import type { FileWatcher } from '../lib/file-watcher.js';
+import type { SyncQueue } from '../lib/sync-queue.js';
 
 /**
  * Sync state operations exposed to tools
@@ -50,6 +51,8 @@ export interface ToolContext {
   hacknplanClient: HacknPlanClient | null;
   // File watcher (Phase 6)
   fileWatcher: FileWatcher;
+  // Sync queue (Phase 7)
+  syncQueue: SyncQueue | null;
 }
 
 /**

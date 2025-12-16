@@ -28,6 +28,7 @@ import { getConfigPath, createPairingManager } from './core/config.js';
 import { SyncStateManager } from './lib/sync-state.js';
 import { HacknPlanClient } from './core/client.js';
 import { FileWatcher } from './lib/file-watcher.js';
+import { SyncQueue } from './lib/sync-queue.js';
 import type { ToolContext } from './tools/types.js';
 import { createGlobalRegistry, getToolSchemas, executeTool } from './tools/registry.js';
 
@@ -78,12 +79,72 @@ fileWatcher.on('change-detected', (change) => {
 
 fileWatcher.on('changes-ready', (changes) => {
   console.error(`[glue] Processing ${changes.length} debounced change(s)`);
-  // TODO: Phase 7 - Trigger sync queue here
+  
+  // Find pairing for the changed file's vault
+  if (syncQueue && changes.length > 0) {
+    // Get vault path from first change (all changes should be from same vault)
+    const changedFile = changes[0].path;
+    const pairing = pairingManager.getAllPairings().find(p => 
+      changedFile.startsWith(p.vaultPath)
+    );
+    
+    if (pairing) {
+      syncQueue.addChanges(changes, pairing);
+    } else {
+      console.error(`[glue] No pairing found for ${changedFile}`);
+    }
+  }
 });
 
 fileWatcher.on('error', (error) => {
   console.error(`[glue] File watcher error: ${error.message}`);
 });
+
+
+// ============ SYNC QUEUE (Phase 7) ============
+
+// Initialize sync queue (only if HacknPlan client is available)
+let syncQueue: SyncQueue | null = null;
+if (hacknplanClient) {
+  syncQueue = new SyncQueue(hacknplanClient, {
+    getSyncState: syncStateManager.getSyncState.bind(syncStateManager),
+    updateSyncState: syncStateManager.updateSyncState.bind(syncStateManager),
+    clearSyncState: syncStateManager.clearSyncState.bind(syncStateManager),
+    getByHacknPlanId: syncStateManager.getByHacknPlanId.bind(syncStateManager),
+    saveSyncState: syncStateManager.save.bind(syncStateManager),
+  }, {
+    concurrency: 3,
+    maxRetries: 3,
+    retryDelayMs: 1000,
+    retryBackoffMultiplier: 2,
+    batchDelayMs: 2000,
+  });
+
+  // Listen to queue events
+  syncQueue.on('queue-updated', (data) => {
+    console.error(`[glue] Queue updated: ${data.pending} pending`);
+  });
+
+  syncQueue.on('processing-started', () => {
+    console.error('[glue] Queue processing started');
+  });
+
+  syncQueue.on('processing-completed', (data) => {
+    console.error(`[glue] Queue processing completed: ${data.processed} processed, ${data.failed} failed`);
+  });
+
+  syncQueue.on('item-completed', (data) => {
+    console.error(`[glue] Synced: ${data.id} (${data.duration}ms)`);
+  });
+
+  syncQueue.on('item-failed', (data) => {
+    console.error(`[glue] Failed: ${data.id} - ${data.error} (retries: ${data.retries})`);
+  });
+
+  syncQueue.on('item-retry', (data) => {
+    console.error(`[glue] Retry: ${data.id} (attempt ${data.retries}, delay ${data.delay}ms)`);
+  });
+}
 
 // ============ TOOL CONTEXT ============
 
@@ -119,6 +180,8 @@ function createToolContext(): ToolContext {
     hacknplanClient,
     // File watcher (Phase 6)
     fileWatcher,
+    // Sync queue (Phase 7)
+    syncQueue,
   };
 }
 
@@ -209,6 +272,12 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   console.error(`[glue] ${signal} received, saving state...`);
   try {
+    // Pause sync queue if running
+    if (syncQueue) {
+      console.error('[glue] Pausing sync queue...');
+      syncQueue.pause();
+    }
+    
     // Stop file watcher if running
     if (fileWatcher.isWatching()) {
       console.error('[glue] Stopping file watcher...');
@@ -240,7 +309,7 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   console.error('[glue] HacknPlan-Obsidian Glue MCP v2.0.0 running');
-  console.error('[glue] TypeScript implementation - Phase 6 (File Watcher)');
+  console.error('[glue] TypeScript implementation - Phase 7 (Sync Queue)');
   console.error(`[glue] Config: ${CONFIG_PATH}`);
   console.error(`[glue] Sync state: ${syncStateManager.getStateFilePath()}`);
   console.error(`[glue] Pairings: ${pairingManager.getAllPairings().length}`);
@@ -248,6 +317,7 @@ async function main(): Promise<void> {
   console.error(`[glue] Tools: ${toolRegistry.size}`);
   console.error(`[glue] HacknPlan client: ${hacknplanClient ? 'enabled' : 'disabled (no API key)'}`);
   console.error(`[glue] File watcher: ready`);
+  console.error(`[glue] Sync queue: ${syncQueue ? 'enabled' : 'disabled (no API key)'}`);
 }
 
 main().catch((error) => {

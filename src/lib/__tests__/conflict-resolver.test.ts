@@ -1,340 +1,300 @@
 /**
- * Tests for Conflict Resolver
- *
- * Run with: npx tsx src/lib/__tests__/conflict-resolver.test.ts
+ * Jest tests for Conflict Resolver
  */
 
 import { ConflictResolver } from '../conflict-resolver.js';
 import type { FileSyncState } from '../../core/types.js';
 
-// Simple assertion helper
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`FAIL: ${message}`);
-  }
-  console.log(`PASS: ${message}`);
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 const resolver = new ConflictResolver();
 
-// ============ Test Cases ============
+describe('ConflictResolver.detectConflict', () => {
+  test('first sync has no conflict', () => {
+    const result = resolver.detectConflict(
+      Date.now(),
+      new Date().toISOString(),
+      undefined // No sync state = first sync
+    );
 
-console.log('\n=== detectConflict Tests ===\n');
+    expect(result.hasConflict).toBe(false);
+    expect(result.strategy).toBe('vault-wins');
+    expect(result.reason).toContain('First sync');
+    expect(result.changedSources?.length).toBe(0);
+  });
 
-// Test 1: First sync - no sync state
-{
-  const result = resolver.detectConflict(
-    Date.now(),
-    new Date().toISOString(),
-    undefined // No sync state = first sync
-  );
+  test('neither changed since last sync', () => {
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
 
-  assert(result.hasConflict === false, 'First sync has no conflict');
-  assert(result.strategy === 'vault-wins', 'First sync defaults to vault-wins');
-  assert(result.reason.includes('First sync'), 'First sync reason is clear');
-  assert(result.changedSources?.length === 0, 'First sync has no changed sources');
-}
+    const syncState: FileSyncState = {
+      lastSynced: isoNow,
+      vaultMtime: now,
+      hacknplanUpdatedAt: isoNow,
+      hacknplanId: 123,
+    };
 
-// Test 2: Neither changed since last sync
-{
-  const now = Date.now();
-  const isoNow = new Date(now).toISOString();
+    const result = resolver.detectConflict(now, isoNow, syncState);
 
-  const syncState: FileSyncState = {
-    lastSynced: isoNow,
-    vaultMtime: now,
-    hacknplanUpdatedAt: isoNow,
-    hacknplanId: 123,
-  };
+    expect(result.hasConflict).toBe(false);
+    expect(result.changedSources?.length).toBe(0);
+    expect(result.reason).toContain('No changes');
+  });
 
-  const result = resolver.detectConflict(now, isoNow, syncState);
+  test('only vault changed since last sync', () => {
+    const syncTime = Date.now() - 60000; // 1 minute ago
+    const currentTime = Date.now();
+    const syncIso = new Date(syncTime).toISOString();
 
-  assert(result.hasConflict === false, 'No changes = no conflict');
-  assert(result.changedSources?.length === 0, 'No changed sources when nothing changed');
-  assert(result.reason.includes('No changes'), 'No changes reason is clear');
-}
+    const syncState: FileSyncState = {
+      lastSynced: syncIso,
+      vaultMtime: syncTime,
+      hacknplanUpdatedAt: syncIso,
+      hacknplanId: 123,
+    };
 
-// Test 3: Only vault changed since last sync
-{
-  const syncTime = Date.now() - 60000; // 1 minute ago
-  const currentTime = Date.now();
-  const syncIso = new Date(syncTime).toISOString();
+    const result = resolver.detectConflict(currentTime, syncIso, syncState);
 
-  const syncState: FileSyncState = {
-    lastSynced: syncIso,
-    vaultMtime: syncTime,
-    hacknplanUpdatedAt: syncIso,
-    hacknplanId: 123,
-  };
+    expect(result.hasConflict).toBe(false);
+    expect(result.strategy).toBe('vault-wins');
+    expect(result.changedSources).toEqual(['vault']);
+    expect(result.reason).toContain('Only vault changed');
+  });
 
-  // Vault changed (current time), HacknPlan unchanged (sync time)
-  const result = resolver.detectConflict(currentTime, syncIso, syncState);
+  test('only HacknPlan changed since last sync', () => {
+    const syncTime = Date.now() - 60000;
+    const currentTime = Date.now();
+    const syncIso = new Date(syncTime).toISOString();
+    const currentIso = new Date(currentTime).toISOString();
 
-  assert(result.hasConflict === false, 'Only vault changed = no conflict');
-  assert(result.strategy === 'vault-wins', 'Only vault changed = vault-wins');
-  assert(deepEqual(result.changedSources, ['vault']), 'Only vault in changed sources');
-  assert(result.reason.includes('Only vault changed'), 'Vault-only change reason is clear');
-}
+    const syncState: FileSyncState = {
+      lastSynced: syncIso,
+      vaultMtime: syncTime,
+      hacknplanUpdatedAt: syncIso,
+      hacknplanId: 123,
+    };
 
-// Test 4: Only HacknPlan changed since last sync
-{
-  const syncTime = Date.now() - 60000; // 1 minute ago
-  const currentTime = Date.now();
-  const syncIso = new Date(syncTime).toISOString();
-  const currentIso = new Date(currentTime).toISOString();
+    const result = resolver.detectConflict(syncTime, currentIso, syncState);
 
-  const syncState: FileSyncState = {
-    lastSynced: syncIso,
-    vaultMtime: syncTime,
-    hacknplanUpdatedAt: syncIso,
-    hacknplanId: 123,
-  };
+    expect(result.hasConflict).toBe(false);
+    expect(result.strategy).toBe('hacknplan-wins');
+    expect(result.changedSources).toEqual(['hacknplan']);
+    expect(result.reason).toContain('Only HacknPlan changed');
+  });
 
-  // Vault unchanged (sync time), HacknPlan changed (current time)
-  const result = resolver.detectConflict(syncTime, currentIso, syncState);
+  test('both changed = conflict', () => {
+    const syncTime = Date.now() - 60000;
+    const vaultTime = Date.now() - 30000;
+    const hacknplanTime = Date.now() - 15000;
+    const syncIso = new Date(syncTime).toISOString();
+    const hacknplanIso = new Date(hacknplanTime).toISOString();
 
-  assert(result.hasConflict === false, 'Only HacknPlan changed = no conflict');
-  assert(result.strategy === 'hacknplan-wins', 'Only HacknPlan changed = hacknplan-wins');
-  assert(deepEqual(result.changedSources, ['hacknplan']), 'Only hacknplan in changed sources');
-  assert(result.reason.includes('Only HacknPlan changed'), 'HacknPlan-only change reason is clear');
-}
+    const syncState: FileSyncState = {
+      lastSynced: syncIso,
+      vaultMtime: syncTime,
+      hacknplanUpdatedAt: syncIso,
+      hacknplanId: 123,
+    };
 
-// Test 5: BOTH changed since last sync = CONFLICT
-{
-  const syncTime = Date.now() - 60000; // 1 minute ago
-  const vaultTime = Date.now() - 30000; // 30 seconds ago
-  const hacknplanTime = Date.now() - 15000; // 15 seconds ago
-  const syncIso = new Date(syncTime).toISOString();
-  const hacknplanIso = new Date(hacknplanTime).toISOString();
+    const result = resolver.detectConflict(vaultTime, hacknplanIso, syncState);
 
-  const syncState: FileSyncState = {
-    lastSynced: syncIso,
-    vaultMtime: syncTime,
-    hacknplanUpdatedAt: syncIso,
-    hacknplanId: 123,
-  };
+    expect(result.hasConflict).toBe(true);
+    expect(result.strategy).toBe('manual-merge');
+    expect(result.changedSources).toContain('vault');
+    expect(result.changedSources).toContain('hacknplan');
+    expect(result.reason).toContain('Both');
+  });
 
-  // Both changed since sync
-  const result = resolver.detectConflict(vaultTime, hacknplanIso, syncState);
+  test('timestamp tolerance - small changes ignored', () => {
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
 
-  assert(result.hasConflict === true, 'Both changed = CONFLICT');
-  assert(result.strategy === 'manual-merge', 'Both changed = manual-merge strategy');
-  assert(
-    Boolean(result.changedSources?.includes('vault') && result.changedSources?.includes('hacknplan')),
-    'Both sources in changed sources'
-  );
-  assert(result.reason.includes('Both'), 'Both changed reason is clear');
-}
+    const syncState: FileSyncState = {
+      lastSynced: isoNow,
+      vaultMtime: now,
+      hacknplanUpdatedAt: isoNow,
+      hacknplanId: 123,
+    };
 
-// Test 6: Timestamp tolerance - small changes within tolerance
-{
-  const now = Date.now();
-  const isoNow = new Date(now).toISOString();
+    const result = resolver.detectConflict(
+      now + 1000,
+      new Date(now + 2000).toISOString(),
+      syncState
+    );
 
-  const syncState: FileSyncState = {
-    lastSynced: isoNow,
-    vaultMtime: now,
-    hacknplanUpdatedAt: isoNow,
-    hacknplanId: 123,
-  };
+    expect(result.hasConflict).toBe(false);
+    expect(result.changedSources?.length).toBe(0);
+  });
 
-  // Small difference within 5 second tolerance
-  const result = resolver.detectConflict(now + 1000, new Date(now + 2000).toISOString(), syncState);
+  test('very old sync state with both changes = conflict', () => {
+    const veryOldTime = Date.now() - 365 * 24 * 60 * 60 * 1000; // 1 year ago
+    const currentTime = Date.now();
+    const oldIso = new Date(veryOldTime).toISOString();
+    const currentIso = new Date(currentTime).toISOString();
 
-  assert(result.hasConflict === false, 'Small timestamp diff within tolerance = no conflict');
-  assert(result.changedSources?.length === 0, 'Small diff not counted as change');
-}
+    const syncState: FileSyncState = {
+      lastSynced: oldIso,
+      vaultMtime: veryOldTime,
+      hacknplanUpdatedAt: oldIso,
+      hacknplanId: 123,
+    };
 
-console.log('\n=== generateContentDiff Tests ===\n');
+    const result = resolver.detectConflict(currentTime, currentIso, syncState);
 
-// Test 7: Generate diff for different content
-{
-  const vaultContent = `# My Document
+    expect(result.hasConflict).toBe(true);
+  });
+});
+
+describe('ConflictResolver.generateContentDiff', () => {
+  test('generates diff for different content', () => {
+    const vaultContent = `# My Document
 
 This is the vault version.
 It has some unique content.`;
 
-  const hacknplanContent = `# My Document
+    const hacknplanContent = `# My Document
 
 This is the HacknPlan version.
 It has different content.`;
 
-  const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
+    const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
 
-  assert(diff.includes('--- HacknPlan'), 'Diff has HacknPlan header');
-  assert(diff.includes('+++ Vault'), 'Diff has Vault header');
-  assert(diff.includes('-This is the HacknPlan version'), 'Diff shows removed HacknPlan line');
-  assert(diff.includes('+This is the vault version'), 'Diff shows added Vault line');
-}
+    expect(diff).toContain('--- HacknPlan');
+    expect(diff).toContain('+++ Vault');
+    expect(diff).toContain('-This is the HacknPlan version');
+    expect(diff).toContain('+This is the vault version');
+  });
 
-// Test 8: Identical content produces no change markers
-{
-  const content = `# Same Content
+  test('identical content produces no change markers', () => {
+    const content = `# Same Content
 
 Both versions are the same.`;
 
-  const diff = resolver.generateContentDiff(content, content);
+    const diff = resolver.generateContentDiff(content, content);
 
-  assert(!diff.includes('-#'), 'No removed lines for identical content');
-  assert(!diff.includes('+#'), 'No added lines for identical content');
-}
+    expect(diff).not.toContain('-#');
+    expect(diff).not.toContain('+#');
+  });
 
-// Test 9: Multi-line diff
-{
-  const vaultContent = `Line 1
+  test('multi-line diff shows all changes', () => {
+    const vaultContent = `Line 1
 Line 2 modified in vault
 Line 3
 New line 4`;
 
-  const hacknplanContent = `Line 1
+    const hacknplanContent = `Line 1
 Line 2 modified in hacknplan
 Line 3`;
 
-  const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
+    const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
 
-  assert(diff.includes('-Line 2 modified in hacknplan'), 'Shows HacknPlan version');
-  assert(diff.includes('+Line 2 modified in vault'), 'Shows Vault version');
-  assert(diff.includes('+New line 4'), 'Shows added line in vault');
-}
+    expect(diff).toContain('-Line 2 modified in hacknplan');
+    expect(diff).toContain('+Line 2 modified in vault');
+    expect(diff).toContain('+New line 4');
+  });
 
-console.log('\n=== resolveConflict Tests ===\n');
+  test('handles empty content', () => {
+    const diff = resolver.generateContentDiff('', '');
+    expect(typeof diff).toBe('string');
+  });
 
-// Test 10: vault-wins strategy
-{
-  const vaultContent = 'Vault content wins';
-  const hacknplanContent = 'HacknPlan content loses';
+  test('handles whitespace-only differences', () => {
+    const vaultContent = 'Line 1\nLine 2';
+    const hacknplanContent = 'Line 1\nLine 2\n';
 
-  const result = resolver.resolveConflict('vault-wins', vaultContent, hacknplanContent);
+    const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
+    expect(typeof diff).toBe('string');
+  });
+});
 
-  assert(result.winner === 'vault', 'Winner is vault');
-  assert(result.content === vaultContent, 'Content is vault content');
-  assert(result.summary.includes('Vault'), 'Summary mentions vault');
-}
+describe('ConflictResolver.resolveConflict', () => {
+  test('vault-wins strategy', () => {
+    const vaultContent = 'Vault content wins';
+    const hacknplanContent = 'HacknPlan content loses';
 
-// Test 11: hacknplan-wins strategy
-{
-  const vaultContent = 'Vault content loses';
-  const hacknplanContent = 'HacknPlan content wins';
+    const result = resolver.resolveConflict('vault-wins', vaultContent, hacknplanContent);
 
-  const result = resolver.resolveConflict('hacknplan-wins', vaultContent, hacknplanContent);
+    expect(result.winner).toBe('vault');
+    expect(result.content).toBe(vaultContent);
+    expect(result.summary).toContain('Vault');
+  });
 
-  assert(result.winner === 'hacknplan', 'Winner is hacknplan');
-  assert(result.content === hacknplanContent, 'Content is HacknPlan content');
-  assert(result.summary.includes('HacknPlan'), 'Summary mentions HacknPlan');
-}
+  test('hacknplan-wins strategy', () => {
+    const vaultContent = 'Vault content loses';
+    const hacknplanContent = 'HacknPlan content wins';
 
-// Test 12: manual-merge strategy creates conflict markers
-{
-  const vaultContent = 'Vault version';
-  const hacknplanContent = 'HacknPlan version';
+    const result = resolver.resolveConflict('hacknplan-wins', vaultContent, hacknplanContent);
 
-  const result = resolver.resolveConflict('manual-merge', vaultContent, hacknplanContent);
+    expect(result.winner).toBe('hacknplan');
+    expect(result.content).toBe(hacknplanContent);
+    expect(result.summary).toContain('HacknPlan');
+  });
 
-  assert(result.winner === 'vault', 'Manual merge returns vault as winner for file');
-  assert(result.content.includes('<<<<<<< VAULT'), 'Has vault conflict marker');
-  assert(result.content.includes('======='), 'Has separator marker');
-  assert(result.content.includes('>>>>>>> HACKNPLAN'), 'Has hacknplan conflict marker');
-  assert(result.content.includes(vaultContent), 'Contains vault content');
-  assert(result.content.includes(hacknplanContent), 'Contains HacknPlan content');
-  assert(result.summary.includes('Manual merge'), 'Summary mentions manual merge');
-}
+  test('manual-merge strategy creates conflict markers', () => {
+    const vaultContent = 'Vault version';
+    const hacknplanContent = 'HacknPlan version';
 
-console.log('\n=== detectConflictWithDiff Tests ===\n');
+    const result = resolver.resolveConflict('manual-merge', vaultContent, hacknplanContent);
 
-// Test 13: Convenience method includes diff on conflict
-{
-  const syncTime = Date.now() - 60000;
-  const vaultTime = Date.now() - 30000;
-  const hacknplanTime = Date.now() - 15000;
-  const syncIso = new Date(syncTime).toISOString();
-  const hacknplanIso = new Date(hacknplanTime).toISOString();
+    expect(result.winner).toBe('vault');
+    expect(result.content).toContain('<<<<<<< VAULT');
+    expect(result.content).toContain('=======');
+    expect(result.content).toContain('>>>>>>> HACKNPLAN');
+    expect(result.content).toContain(vaultContent);
+    expect(result.content).toContain(hacknplanContent);
+    expect(result.summary).toContain('Manual merge');
+  });
+});
 
-  const syncState: FileSyncState = {
-    lastSynced: syncIso,
-    vaultMtime: syncTime,
-    hacknplanUpdatedAt: syncIso,
-    hacknplanId: 123,
-  };
+describe('ConflictResolver.detectConflictWithDiff', () => {
+  test('includes diff on conflict', () => {
+    const syncTime = Date.now() - 60000;
+    const vaultTime = Date.now() - 30000;
+    const hacknplanTime = Date.now() - 15000;
+    const syncIso = new Date(syncTime).toISOString();
+    const hacknplanIso = new Date(hacknplanTime).toISOString();
 
-  const vaultContent = 'Vault content';
-  const hacknplanContent = 'HacknPlan content';
+    const syncState: FileSyncState = {
+      lastSynced: syncIso,
+      vaultMtime: syncTime,
+      hacknplanUpdatedAt: syncIso,
+      hacknplanId: 123,
+    };
 
-  const result = resolver.detectConflictWithDiff(
-    vaultTime,
-    hacknplanIso,
-    syncState,
-    vaultContent,
-    hacknplanContent
-  );
+    const vaultContent = 'Vault content';
+    const hacknplanContent = 'HacknPlan content';
 
-  assert(result.hasConflict === true, 'Conflict detected');
-  assert(result.contentDiff !== undefined, 'Diff included in result');
-  assert(result.contentDiff!.includes('+Vault content'), 'Diff shows vault content');
-}
+    const result = resolver.detectConflictWithDiff(
+      vaultTime,
+      hacknplanIso,
+      syncState,
+      vaultContent,
+      hacknplanContent
+    );
 
-// Test 14: No diff when no conflict
-{
-  const now = Date.now();
-  const isoNow = new Date(now).toISOString();
+    expect(result.hasConflict).toBe(true);
+    expect(result.contentDiff).toBeDefined();
+    expect(result.contentDiff).toContain('+Vault content');
+  });
 
-  const syncState: FileSyncState = {
-    lastSynced: isoNow,
-    vaultMtime: now,
-    hacknplanUpdatedAt: isoNow,
-    hacknplanId: 123,
-  };
+  test('no diff when no conflict', () => {
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
 
-  const result = resolver.detectConflictWithDiff(
-    now,
-    isoNow,
-    syncState,
-    'Some content',
-    'Other content'
-  );
+    const syncState: FileSyncState = {
+      lastSynced: isoNow,
+      vaultMtime: now,
+      hacknplanUpdatedAt: isoNow,
+      hacknplanId: 123,
+    };
 
-  assert(result.hasConflict === false, 'No conflict');
-  assert(result.contentDiff === undefined, 'No diff when no conflict');
-}
+    const result = resolver.detectConflictWithDiff(
+      now,
+      isoNow,
+      syncState,
+      'Some content',
+      'Other content'
+    );
 
-console.log('\n=== Edge Cases ===\n');
-
-// Test 15: Empty content handling
-{
-  const diff = resolver.generateContentDiff('', '');
-  assert(typeof diff === 'string', 'Empty content produces valid diff string');
-}
-
-// Test 16: Content with only whitespace differences
-{
-  const vaultContent = 'Line 1\nLine 2';
-  const hacknplanContent = 'Line 1\nLine 2\n';
-
-  const diff = resolver.generateContentDiff(vaultContent, hacknplanContent);
-  assert(typeof diff === 'string', 'Whitespace diff produces valid string');
-}
-
-// Test 17: Very long ago sync state
-{
-  const veryOldTime = Date.now() - 365 * 24 * 60 * 60 * 1000; // 1 year ago
-  const currentTime = Date.now();
-  const oldIso = new Date(veryOldTime).toISOString();
-  const currentIso = new Date(currentTime).toISOString();
-
-  const syncState: FileSyncState = {
-    lastSynced: oldIso,
-    vaultMtime: veryOldTime,
-    hacknplanUpdatedAt: oldIso,
-    hacknplanId: 123,
-  };
-
-  // Both changed (from very long ago)
-  const result = resolver.detectConflict(currentTime, currentIso, syncState);
-
-  assert(result.hasConflict === true, 'Very old sync state with both changes = conflict');
-}
-
-console.log('\n=== All Tests Passed! ===\n');
+    expect(result.hasConflict).toBe(false);
+    expect(result.contentDiff).toBeUndefined();
+  });
+});

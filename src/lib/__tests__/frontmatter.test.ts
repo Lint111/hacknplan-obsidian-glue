@@ -1,7 +1,5 @@
 /**
- * Tests for frontmatter parsing utilities
- *
- * Run with: npx tsx src/lib/__tests__/frontmatter.test.ts
+ * Jest tests for frontmatter parsing utilities
  */
 
 import {
@@ -13,50 +11,32 @@ import {
   extractTags,
 } from '../frontmatter.js';
 
-// Simple assertion helper
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`FAIL: ${message}`);
-  }
-  console.log(`PASS: ${message}`);
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-// ============ Test Cases ============
-
-console.log('\n=== extractFrontmatter Tests ===\n');
-
-// Test 1: Simple key-value pairs
-{
-  const content = `---
+describe('extractFrontmatter', () => {
+  test('extracts simple key-value pairs', () => {
+    const content = `---
 hacknplan_id: 123
 title: My Document
 ---
 # Content here`;
 
-  const fm = extractFrontmatter(content);
-  assert(fm.hacknplan_id === 123, 'Simple numeric value parsed correctly');
-  assert(fm.title === 'My Document', 'Simple string value parsed correctly');
-}
+    const fm = extractFrontmatter(content);
+    expect(fm.hacknplan_id).toBe(123);
+    expect(fm.title).toBe('My Document');
+  });
 
-// Test 2: YAML arrays (inline syntax)
-{
-  const content = `---
+  test('parses YAML arrays (inline syntax)', () => {
+    const content = `---
 tags: [vulkan, svo, mcp]
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(Array.isArray(fm.tags), 'Inline array recognized as array');
-  assert(deepEqual(fm.tags, ['vulkan', 'svo', 'mcp']), 'Inline array values parsed correctly');
-}
+    const fm = extractFrontmatter(content);
+    expect(Array.isArray(fm.tags)).toBe(true);
+    expect(fm.tags).toEqual(['vulkan', 'svo', 'mcp']);
+  });
 
-// Test 3: YAML arrays (multiline syntax)
-{
-  const content = `---
+  test('parses YAML arrays (multiline syntax)', () => {
+    const content = `---
 tags:
   - vulkan
   - svo
@@ -64,27 +44,25 @@ tags:
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(Array.isArray(fm.tags), 'Multiline array recognized as array');
-  assert(deepEqual(fm.tags, ['vulkan', 'svo', 'mcp']), 'Multiline array values parsed correctly');
-}
+    const fm = extractFrontmatter(content);
+    expect(Array.isArray(fm.tags)).toBe(true);
+    expect(fm.tags).toEqual(['vulkan', 'svo', 'mcp']);
+  });
 
-// Test 4: Nested objects (inline syntax)
-{
-  const content = `---
+  test('parses nested objects (inline syntax)', () => {
+    const content = `---
 config: { sync: { enabled: true } }
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(typeof fm.config === 'object', 'Nested object recognized');
-  const config = fm.config as { sync: { enabled: boolean } };
-  assert(config.sync.enabled === true, 'Nested object value accessible');
-}
+    const fm = extractFrontmatter(content);
+    expect(typeof fm.config).toBe('object');
+    const config = fm.config as { sync: { enabled: boolean } };
+    expect(config.sync.enabled).toBe(true);
+  });
 
-// Test 5: Nested objects (multiline syntax)
-{
-  const content = `---
+  test('parses nested objects (multiline syntax)', () => {
+    const content = `---
 config:
   sync:
     enabled: true
@@ -94,19 +72,18 @@ config:
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  const config = fm.config as {
-    sync: { enabled: boolean; interval: number };
-    backup: { path: string };
-  };
-  assert(config.sync.enabled === true, 'Multiline nested object - boolean');
-  assert(config.sync.interval === 3600, 'Multiline nested object - number');
-  assert(config.backup.path === '/var/backup', 'Multiline nested object - string');
-}
+    const fm = extractFrontmatter(content);
+    const config = fm.config as {
+      sync: { enabled: boolean; interval: number };
+      backup: { path: string };
+    };
+    expect(config.sync.enabled).toBe(true);
+    expect(config.sync.interval).toBe(3600);
+    expect(config.backup.path).toBe('/var/backup');
+  });
 
-// Test 6: Multi-line strings (literal block scalar)
-{
-  const content = `---
+  test('parses multi-line strings (literal block scalar)', () => {
+    const content = `---
 description: |
   This is a multi-line description.
   It spans multiple lines.
@@ -114,14 +91,13 @@ description: |
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(typeof fm.description === 'string', 'Multi-line string is string');
-  assert((fm.description as string).includes('multiple lines'), 'Multi-line string content preserved');
-}
+    const fm = extractFrontmatter(content);
+    expect(typeof fm.description).toBe('string');
+    expect((fm.description as string).includes('multiple lines')).toBe(true);
+  });
 
-// Test 7: Multi-line strings (folded block scalar)
-{
-  const content = `---
+  test('parses multi-line strings (folded block scalar)', () => {
+    const content = `---
 summary: >
   This is a folded string.
   Line breaks become spaces.
@@ -129,72 +105,65 @@ summary: >
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(typeof fm.summary === 'string', 'Folded string is string');
-  assert((fm.summary as string).includes('folded string'), 'Folded string content preserved');
-}
+    const fm = extractFrontmatter(content);
+    expect(typeof fm.summary).toBe('string');
+    expect((fm.summary as string).includes('folded string')).toBe(true);
+  });
 
-// Test 8: Missing frontmatter
-{
-  const content = `# Just a markdown document
+  test('handles missing frontmatter', () => {
+    const content = `# Just a markdown document
 No frontmatter here.`;
 
-  const fm = extractFrontmatter(content);
-  assert(Object.keys(fm).length === 0, 'Missing frontmatter returns empty object');
-}
+    const fm = extractFrontmatter(content);
+    expect(Object.keys(fm).length).toBe(0);
+  });
 
-// Test 9: Empty frontmatter
-{
-  const content = `---
+  test('handles empty frontmatter', () => {
+    const content = `---
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(Object.keys(fm).length === 0, 'Empty frontmatter returns empty object');
-}
+    const fm = extractFrontmatter(content);
+    expect(Object.keys(fm).length).toBe(0);
+  });
 
-// Test 10: Invalid YAML (graceful failure)
-{
-  const content = `---
+  test('handles invalid YAML gracefully', () => {
+    const content = `---
 key: [unclosed bracket
 another: value
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  // Should return empty object on parse error, not throw
-  assert(typeof fm === 'object', 'Invalid YAML returns empty object (graceful failure)');
-}
+    const fm = extractFrontmatter(content);
+    expect(typeof fm).toBe('object');
+  });
 
-// Test 11: Boolean values
-{
-  const content = `---
+  test('parses boolean values', () => {
+    const content = `---
 enabled: true
 disabled: false
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(fm.enabled === true, 'Boolean true parsed correctly');
-  assert(fm.disabled === false, 'Boolean false parsed correctly');
-}
+    const fm = extractFrontmatter(content);
+    expect(fm.enabled).toBe(true);
+    expect(fm.disabled).toBe(false);
+  });
 
-// Test 12: Null values
-{
-  const content = `---
+  test('parses null values', () => {
+    const content = `---
 value: null
 other: ~
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(fm.value === null, 'Explicit null parsed correctly');
-  assert(fm.other === null, 'YAML ~ (null shorthand) parsed correctly');
-}
+    const fm = extractFrontmatter(content);
+    expect(fm.value).toBeNull();
+    expect(fm.other).toBeNull();
+  });
 
-// Test 13: Mixed types
-{
-  const content = `---
+  test('parses mixed types', () => {
+    const content = `---
 hacknplan_id: 123
 hacknplan_type: "Architecture"
 tags: [vulkan, mcp]
@@ -205,60 +174,68 @@ enabled: true
 ---
 # Content`;
 
-  const fm = extractFrontmatter(content);
-  assert(fm.hacknplan_id === 123, 'Mixed - number');
-  assert(fm.hacknplan_type === 'Architecture', 'Mixed - quoted string');
-  assert(Array.isArray(fm.tags), 'Mixed - array');
-  assert(typeof fm.metadata === 'object', 'Mixed - object');
-  assert(fm.enabled === true, 'Mixed - boolean');
-}
-
-console.log('\n=== updateFrontmatter Tests ===\n');
-
-// Test 14: Update existing frontmatter
-{
-  const content = `---
-title: My Doc
----
-# Content`;
-
-  const updated = updateFrontmatter(content, { synced_at: '2025-01-15T10:00:00Z' });
-  const fm = extractFrontmatter(updated);
-  assert(fm.title === 'My Doc', 'Update preserves existing fields');
-  assert(fm.synced_at === '2025-01-15T10:00:00Z', 'Update adds new field');
-}
-
-// Test 15: Update with complex values
-{
-  const content = `---
-title: My Doc
----
-# Content`;
-
-  const updated = updateFrontmatter(content, {
-    tags: ['vulkan', 'svo'],
-    config: { sync: true },
+    const fm = extractFrontmatter(content);
+    expect(fm.hacknplan_id).toBe(123);
+    expect(fm.hacknplan_type).toBe('Architecture');
+    expect(Array.isArray(fm.tags)).toBe(true);
+    expect(typeof fm.metadata).toBe('object');
+    expect(fm.enabled).toBe(true);
   });
-  const fm = extractFrontmatter(updated);
-  assert(Array.isArray(fm.tags), 'Update with array value');
-  assert(typeof fm.config === 'object', 'Update with object value');
-}
+});
 
-// Test 16: Update document without frontmatter
-{
-  const content = `# Just content
+describe('updateFrontmatter', () => {
+  test('updates existing frontmatter', () => {
+    const content = `---
+title: My Doc
+---
+# Content`;
+
+    const updated = updateFrontmatter(content, { synced_at: '2025-01-15T10:00:00Z' });
+    const fm = extractFrontmatter(updated);
+    expect(fm.title).toBe('My Doc');
+    expect(fm.synced_at).toBe('2025-01-15T10:00:00Z');
+  });
+
+  test('updates with complex values', () => {
+    const content = `---
+title: My Doc
+---
+# Content`;
+
+    const updated = updateFrontmatter(content, {
+      tags: ['vulkan', 'svo'],
+      config: { sync: true },
+    });
+    const fm = extractFrontmatter(updated);
+    expect(Array.isArray(fm.tags)).toBe(true);
+    expect(typeof fm.config).toBe('object');
+  });
+
+  test('creates frontmatter if missing', () => {
+    const content = `# Just content
 No frontmatter.`;
 
-  const updated = updateFrontmatter(content, { title: 'New Title' });
-  const fm = extractFrontmatter(updated);
-  assert(fm.title === 'New Title', 'Update creates frontmatter if missing');
-}
+    const updated = updateFrontmatter(content, { title: 'New Title' });
+    const fm = extractFrontmatter(updated);
+    expect(fm.title).toBe('New Title');
+  });
 
-console.log('\n=== stripFrontmatter Tests ===\n');
+  test('preserves content when updating', () => {
+    const content = `---
+title: Original
+---
+# Important Content
+This should be preserved.`;
 
-// Test 17: Strip frontmatter
-{
-  const content = `---
+    const updated = updateFrontmatter(content, { title: 'Updated' });
+    expect(updated).toContain('# Important Content');
+    expect(updated).toContain('This should be preserved.');
+  });
+});
+
+describe('stripFrontmatter', () => {
+  test('strips frontmatter from document', () => {
+    const content = `---
 title: My Doc
 tags: [a, b, c]
 ---
@@ -266,79 +243,129 @@ tags: [a, b, c]
 
 Some text here.`;
 
-  const stripped = stripFrontmatter(content);
-  assert(!stripped.includes('---'), 'Frontmatter delimiters removed');
-  assert(stripped.includes('# Actual Content'), 'Content preserved');
-  assert(stripped.includes('Some text here'), 'Full content preserved');
-}
+    const stripped = stripFrontmatter(content);
+    expect(stripped.includes('---')).toBe(false);
+    expect(stripped.includes('# Actual Content')).toBe(true);
+    expect(stripped.includes('Some text here')).toBe(true);
+  });
 
-// Test 18: Strip from document without frontmatter
-{
-  const content = `# Just Content
+  test('leaves document unchanged if no frontmatter', () => {
+    const content = `# Just Content
 No frontmatter.`;
 
-  const stripped = stripFrontmatter(content);
-  assert(stripped === content, 'No-frontmatter document unchanged');
-}
+    const stripped = stripFrontmatter(content);
+    expect(stripped).toBe(content);
+  });
 
-console.log('\n=== generateFrontmatter Tests ===\n');
+  test('handles empty document', () => {
+    const stripped = stripFrontmatter('');
+    expect(stripped).toBe('');
+  });
+});
 
-// Test 19: Generate simple frontmatter
-{
-  const fm = generateFrontmatter({ title: 'Test', id: 123 });
-  assert(fm.includes('---'), 'Generated frontmatter has delimiters');
-  assert(fm.includes('title:'), 'Generated frontmatter has title');
-  assert(fm.includes('123'), 'Generated frontmatter has numeric value');
-}
+describe('generateFrontmatter', () => {
+  test('generates simple frontmatter', () => {
+    const fm = generateFrontmatter({ title: 'Test', id: 123 });
+    expect(fm.includes('---')).toBe(true);
+    expect(fm.includes('title:')).toBe(true);
+    expect(fm.includes('123')).toBe(true);
+  });
 
-// Test 20: Generate frontmatter with arrays
-{
-  const fm = generateFrontmatter({ tags: ['a', 'b', 'c'] });
-  assert(fm.includes('tags:'), 'Generated frontmatter has array field');
-  // gray-matter will output as YAML array
-}
+  test('generates frontmatter with arrays', () => {
+    const fm = generateFrontmatter({ tags: ['a', 'b', 'c'] });
+    expect(fm.includes('tags:')).toBe(true);
+  });
 
-console.log('\n=== hasFrontmatter Tests ===\n');
+  test('generates frontmatter with nested objects', () => {
+    const fm = generateFrontmatter({
+      config: {
+        sync: true,
+        timeout: 5000
+      }
+    });
+    expect(fm.includes('config:')).toBe(true);
+  });
 
-// Test 21: Has frontmatter
-{
-  const content = `---
+  test('generates empty frontmatter for empty object', () => {
+    const fm = generateFrontmatter({});
+    // gray-matter returns empty string for empty frontmatter
+    expect(fm).toBe('');
+  });
+});
+
+describe('hasFrontmatter', () => {
+  test('detects frontmatter presence', () => {
+    const content = `---
 title: Test
 ---
 # Content`;
 
-  assert(hasFrontmatter(content) === true, 'Detects frontmatter presence');
-}
+    expect(hasFrontmatter(content)).toBe(true);
+  });
 
-// Test 22: No frontmatter
-{
-  const content = `# Just content`;
-  assert(hasFrontmatter(content) === false, 'Detects frontmatter absence');
-}
+  test('detects frontmatter absence', () => {
+    const content = `# Just content`;
+    expect(hasFrontmatter(content)).toBe(false);
+  });
 
-console.log('\n=== extractTags Tests ===\n');
+  test('handles empty string', () => {
+    expect(hasFrontmatter('')).toBe(false);
+  });
 
-// Test 23: Extract hashtags from content
-{
-  const content = `# Document
+  test('handles partial frontmatter marker', () => {
+    const content = `---
+This is not frontmatter, missing closing marker`;
+    // Depends on implementation - may or may not be detected
+    const result = hasFrontmatter(content);
+    expect(typeof result).toBe('boolean');
+  });
+});
+
+describe('extractTags', () => {
+  test('extracts hashtags from content', () => {
+    const content = `# Document
 
 This uses #vulkan and #render-graph for #vulkan rendering.
 Also #mcp integration.`;
 
-  const tags = extractTags(content);
-  assert(tags.includes('vulkan'), 'Extracts vulkan tag');
-  assert(tags.includes('render-graph'), 'Extracts hyphenated tag');
-  assert(tags.includes('mcp'), 'Extracts mcp tag');
-  assert(tags.length === 3, 'Deduplicates tags');
-}
+    const tags = extractTags(content);
+    expect(tags).toContain('vulkan');
+    expect(tags).toContain('render-graph');
+    expect(tags).toContain('mcp');
+    expect(tags.length).toBe(3); // Deduplicated
+  });
 
-// Test 24: No tags
-{
-  const content = `# Just content
+  test('handles no tags', () => {
+    const content = `# Just content
 No hashtags here.`;
 
-  const tags = extractTags(content);
-  assert(tags.length === 0, 'Returns empty array for no tags');
-}
+    const tags = extractTags(content);
+    expect(tags.length).toBe(0);
+  });
 
-console.log('\n=== All Tests Passed! ===\n');
+  test('handles empty content', () => {
+    const tags = extractTags('');
+    expect(tags.length).toBe(0);
+  });
+
+  test('handles tags with hyphens (underscores not supported)', () => {
+    const content = 'Using #snake_case and #kebab-case tags.';
+    const tags = extractTags(content);
+    // Regex only supports [a-zA-Z0-9-], so underscores break the tag
+    expect(tags).toContain('snake'); // Gets 'snake' before underscore
+    expect(tags).toContain('kebab-case'); // Hyphens work
+  });
+
+  test('ignores markdown headers', () => {
+    const content = `# Header
+## Subheader
+### Sub-subheader
+
+Use #real-tag here.`;
+
+    const tags = extractTags(content);
+    expect(tags).not.toContain('Header');
+    expect(tags).not.toContain('Subheader');
+    expect(tags).toContain('real-tag');
+  });
+});

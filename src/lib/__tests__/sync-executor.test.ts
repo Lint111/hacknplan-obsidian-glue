@@ -109,8 +109,9 @@ describe('sync-executor', () => {
         designElementId: 123,
         name: 'Test Doc',
         description: 'Test description',
+        createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-01T00:00:00Z',
-        type: { typeId: 9, name: 'Architecture' },
+        type: { designElementTypeId: 9, name: 'Architecture' },
       };
 
       (mockClient.createDesignElement as jest.Mock).mockResolvedValue(mockElement);
@@ -121,7 +122,7 @@ describe('sync-executor', () => {
         sourceFile: '/vault/Doc.md',
         name: 'Test Doc',
         description: '# Content',
-        type: { typeId: 9, name: 'Architecture' },
+        typeId: 9,
         extractedTags: ['vulkan'],
       };
 
@@ -131,7 +132,7 @@ describe('sync-executor', () => {
       expect(result.element).toBeDefined();
       expect(result.element!.designElementId).toBe(123);
       expect(mockClient.createDesignElement).toHaveBeenCalledWith(1, {
-        type: { typeId: 9, name: 'Architecture' },
+        typeId: 9,
         name: 'Test Doc',
         description: '# Content',
       });
@@ -152,7 +153,7 @@ describe('sync-executor', () => {
         sourceFile: '/vault/Doc.md',
         name: 'Test Doc',
         description: '# Content',
-        type: { typeId: 9, name: 'Architecture' },
+        typeId: 9,
         extractedTags: [],
       };
 
@@ -169,8 +170,9 @@ describe('sync-executor', () => {
         designElementId: 123,
         name: 'Test',
         description: 'Test',
+        createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-01T00:00:00Z',
-        type: { typeId: 9, name: 'Architecture' },
+        type: { designElementTypeId: 9, name: 'Architecture' },
       };
 
       (mockClient.createDesignElement as jest.Mock).mockResolvedValue(mockElement);
@@ -180,7 +182,7 @@ describe('sync-executor', () => {
         sourceFile: '/vault/Doc.md',
         name: 'Test',
         description: 'Test',
-        type: { typeId: 9, name: 'Architecture' },
+        typeId: 9,
         extractedTags: [],
       };
 
@@ -200,8 +202,9 @@ describe('sync-executor', () => {
         designElementId: 123,
         name: 'Updated Doc',
         description: 'Updated description',
+        createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-02T00:00:00Z',
-        type: { typeId: 9, name: 'Architecture' },
+        type: { designElementTypeId: 9, name: 'Architecture' },
       };
 
       (mockClient.updateDesignElement as jest.Mock).mockResolvedValue(mockElement);
@@ -291,7 +294,7 @@ describe('sync-executor', () => {
         },
       ];
 
-      await rollbackOperations(rollbackStack, mockSyncState);
+      await rollbackOperations(rollbackStack, mockClient, mockSyncState);
 
       expect(mockSyncState.clearSyncState).toHaveBeenCalledWith('/vault/Doc.md');
     });
@@ -424,8 +427,9 @@ describe('sync-executor', () => {
         designElementId: 123,
         name: 'Test',
         description: 'Test',
+        createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-01T00:00:00Z',
-        type: { typeId: 9, name: 'Architecture' },
+        type: { designElementTypeId: 9, name: 'Architecture' },
       };
 
       (mockClient.createDesignElement as jest.Mock).mockResolvedValue(mockElement);
@@ -437,7 +441,7 @@ describe('sync-executor', () => {
           sourceFile: '/vault/Doc.md',
           name: 'Test',
           description: 'Test',
-          type: { typeId: 9, name: 'Architecture' },
+          typeId: 9,
           extractedTags: [],
         },
       ];
@@ -456,8 +460,9 @@ describe('sync-executor', () => {
         designElementId: 123,
         name: 'Updated',
         description: 'Updated',
+        createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-02T00:00:00Z',
-        type: { typeId: 9, name: 'Architecture' },
+        type: { designElementTypeId: 9, name: 'Architecture' },
       };
 
       (mockClient.updateDesignElement as jest.Mock).mockResolvedValue(mockElement);
@@ -490,7 +495,7 @@ describe('sync-executor', () => {
           sourceFile: '/vault/Doc.md',
           name: 'Test',
           description: 'Test',
-          type: { typeId: 9, name: 'Architecture' },
+          typeId: 9,
           extractedTags: [],
         },
       ];
@@ -511,7 +516,7 @@ describe('sync-executor', () => {
           name: 'Doc2',
           description: 'Doc2',
           updatedAt: '2025-01-01T00:00:00Z',
-          type: { typeId: 9, name: 'Architecture' },
+          type: { designElementTypeId: 9, name: 'Architecture' },
         });
 
       const creates: CreateOperation[] = [
@@ -586,7 +591,7 @@ describe('sync-executor', () => {
             name: 'Doc1',
             description: 'Doc1',
             updatedAt: '2025-01-01T00:00:00Z',
-            type: { typeId: 9, name: 'Architecture' },
+            type: { designElementTypeId: 9, name: 'Architecture' },
           });
         }
         return Promise.reject(new Error('Error on second'));

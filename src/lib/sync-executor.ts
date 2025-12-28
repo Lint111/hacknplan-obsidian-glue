@@ -13,6 +13,9 @@ import type {
   SyncExecutionResult,
   Pairing,
   FileSyncState,
+  SyncEventCallback,
+  WorkItemCreatedEvent,
+  WorkItemUpdatedEvent,
 } from '../core/types.js';
 import type { HacknPlanClient, HacknPlanDesignElement } from '../core/client.js';
 import { updateFrontmatter, stripFrontmatter } from './frontmatter.js';
@@ -86,7 +89,8 @@ export async function executeCreateOperation(
   projectId: number,
   client: HacknPlanClient,
   syncState: SyncStateOps,
-  rollbackStack: RollbackEntry[]
+  rollbackStack: RollbackEntry[],
+  onEvent?: SyncEventCallback
 ): Promise<{ element: HacknPlanDesignElement; error?: undefined } | { element?: undefined; error: string }> {
   let hacknplanElement: HacknPlanDesignElement | null = null;
   let originalFrontmatter: string | null = null;
@@ -134,6 +138,18 @@ export async function executeCreateOperation(
     });
 
     console.error(`[glue] Created: ${op.name} -> HacknPlan #${hacknplanElement.designElementId}`);
+
+    // Emit work-item-created event
+    if (onEvent && hacknplanElement) {
+      const event: WorkItemCreatedEvent = {
+        workItemId: hacknplanElement.designElementId,
+        title: hacknplanElement.name,
+        sourceFile: op.sourceFile,
+        timestamp: new Date().toISOString(),
+      };
+      await onEvent(event);
+    }
+
     return { element: hacknplanElement };
 
   } catch (error) {
@@ -161,7 +177,8 @@ export async function executeUpdateOperation(
   projectId: number,
   client: HacknPlanClient,
   syncState: SyncStateOps,
-  rollbackStack: RollbackEntry[]
+  rollbackStack: RollbackEntry[],
+  onEvent?: SyncEventCallback
 ): Promise<{ element: HacknPlanDesignElement; error?: undefined } | { element?: undefined; error: string }> {
   try {
     // Step 1: Update in HacknPlan
@@ -191,6 +208,19 @@ export async function executeUpdateOperation(
     });
 
     console.error(`[glue] Updated: ${op.name} (HacknPlan #${op.designElementId})`);
+
+    // Emit work-item-updated event
+    if (onEvent && hacknplanElement) {
+      const event: WorkItemUpdatedEvent = {
+        workItemId: hacknplanElement.designElementId,
+        title: hacknplanElement.name,
+        sourceFile: op.sourceFile,
+        changedFields: ['name', 'description'],
+        timestamp: new Date().toISOString(),
+      };
+      await onEvent(event);
+    }
+
     return { element: hacknplanElement };
 
   } catch (error) {
@@ -315,9 +345,9 @@ export async function executeSyncBatch(
   projectId: number,
   client: HacknPlanClient,
   syncState: SyncStateOps,
-  options: { stopOnError?: boolean; rollbackOnError?: boolean } = {}
+  options: { stopOnError?: boolean; rollbackOnError?: boolean; onEvent?: SyncEventCallback } = {}
 ): Promise<SyncExecutionResult> {
-  const { stopOnError = false, rollbackOnError = false } = options;
+  const { stopOnError = false, rollbackOnError = false, onEvent } = options;
   const rollbackStack: RollbackEntry[] = [];
 
   const result: SyncExecutionResult = {
@@ -340,7 +370,7 @@ export async function executeSyncBatch(
       continue;
     }
 
-    const createResult = await executeCreateOperation(op, projectId, client, syncState, rollbackStack);
+    const createResult = await executeCreateOperation(op, projectId, client, syncState, rollbackStack, onEvent);
 
     if (createResult.error) {
       result.errors.push({ file: op.sourceFile, error: createResult.error });
@@ -363,7 +393,7 @@ export async function executeSyncBatch(
 
   // Execute update operations
   for (const op of updates) {
-    const updateResult = await executeUpdateOperation(op, projectId, client, syncState, rollbackStack);
+    const updateResult = await executeUpdateOperation(op, projectId, client, syncState, rollbackStack, onEvent);
 
     if (updateResult.error) {
       result.errors.push({ file: op.sourceFile, error: updateResult.error });

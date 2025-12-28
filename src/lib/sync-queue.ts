@@ -4,7 +4,7 @@ import type { FileChange } from './file-watcher.js';
 
 import type { HacknPlanClient } from '../core/client.js';
 import type { SyncStateOps } from '../tools/types.js';
-import type { Pairing } from '../core/types.js';
+import type { Pairing, SyncEventCallback } from '../core/types.js';
 
 /**
  * Queue item representing a pending sync operation
@@ -62,16 +62,18 @@ export class SyncQueue extends EventEmitter {
   private syncState: SyncStateOps;
   private limit: ReturnType<typeof pLimit>;
   private config: Required<SyncQueueConfig>;
+  private onEvent?: SyncEventCallback;
 
   private isProcessing = false;
   private processingTimeMs: number[] = [];
   private totalProcessed = 0;
   private lastProcessedAt: Date | null = null;
 
-  constructor(hacknplanClient: HacknPlanClient, syncState: SyncStateOps, config: SyncQueueConfig = {}) {
+  constructor(hacknplanClient: HacknPlanClient, syncState: SyncStateOps, config: SyncQueueConfig = {}, onEvent?: SyncEventCallback) {
     super();
     this.hacknplanClient = hacknplanClient;
     this.syncState = syncState;
+    this.onEvent = onEvent;
     this.config = {
       concurrency: config.concurrency ?? 3,
       maxRetries: config.maxRetries ?? 3,
@@ -166,7 +168,8 @@ export class SyncQueue extends EventEmitter {
         item.change.path,
         item.pairing,
         this.hacknplanClient,
-        this.syncState
+        this.syncState,
+        this.onEvent
       );
 
       // Check for errors

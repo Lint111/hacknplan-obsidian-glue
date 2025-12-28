@@ -31,6 +31,13 @@ import { FileWatcher } from './lib/file-watcher.js';
 import { SyncQueue } from './lib/sync-queue.js';
 import type { ToolContext } from './tools/types.js';
 import { createGlobalRegistry, getToolSchemas, executeTool } from './tools/registry.js';
+import type { WorkItemCreatedEvent, WorkItemUpdatedEvent } from './core/types.js';
+import {
+  injectMarkerIntoFile,
+  createCompletedMarker,
+  createOutOfSyncMarker,
+  createNeedsReviewMarker,
+} from './lib/marker-injector.js';
 
 // ============ CONFIGURATION ============
 
@@ -101,6 +108,41 @@ fileWatcher.on('error', (error) => {
 });
 
 
+// ============ MARKER INJECTION HANDLER (Phase 11) ============
+
+/**
+ * Handle sync events and inject markers into vault documents
+ */
+async function handleSyncEvent(event: WorkItemCreatedEvent | WorkItemUpdatedEvent): Promise<void> {
+  try {
+    // Find pairing for the source file
+    const pairing = pairingManager.getAllPairings().find(p =>
+      event.sourceFile.startsWith(p.vaultPath)
+    );
+
+    if (!pairing || !pairing.autoInjectMarkers) {
+      return; // Auto-injection disabled for this pairing
+    }
+
+    // Determine marker type based on event
+    const isCreate = 'workItemId' in event && !('changedFields' in event);
+    const marker = isCreate
+      ? createCompletedMarker(event.workItemId, `Created: ${event.title}`)
+      : createOutOfSyncMarker(event.workItemId, `Updated: ${event.title}`);
+
+    // Inject marker into source file
+    await injectMarkerIntoFile(
+      event.sourceFile,
+      marker,
+      { position: pairing.markerPosition || 'after-frontmatter' }
+    );
+
+    console.error(`[glue] Injected ${marker.type} marker for HP-${event.workItemId} in ${event.sourceFile}`);
+  } catch (error) {
+    console.error(`[glue] Failed to inject marker: ${(error as Error).message}`);
+  }
+}
+
 // ============ SYNC QUEUE (Phase 7) ============
 
 // Initialize sync queue (only if HacknPlan client is available)
@@ -118,7 +160,7 @@ if (hacknplanClient) {
     retryDelayMs: 1000,
     retryBackoffMultiplier: 2,
     batchDelayMs: 2000,
-  });
+  }, handleSyncEvent);
 
   // Listen to queue events
   syncQueue.on('queue-updated', (data) => {

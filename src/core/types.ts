@@ -28,6 +28,10 @@ export interface Pairing {
   defaultBoard: number | null;
   createdAt: string;
   updatedAt: string;
+  /** Enable automatic review marker injection on sync events (default: false) */
+  autoInjectMarkers?: boolean;
+  /** Position for marker injection: 'after-frontmatter' or 'end-of-file' (default: 'after-frontmatter') */
+  markerPosition?: 'after-frontmatter' | 'end-of-file';
 }
 
 /**
@@ -288,6 +292,34 @@ export interface ResolutionResult {
   /** Summary of what was resolved */
   summary: string;
 }
+
+// ============ EVENT TYPES ============
+
+/**
+ * Event emitted when a work item is created
+ */
+export interface WorkItemCreatedEvent {
+  workItemId: number;
+  title: string;
+  sourceFile: string;
+  timestamp: string;
+}
+
+/**
+ * Event emitted when a work item is updated
+ */
+export interface WorkItemUpdatedEvent {
+  workItemId: number;
+  title: string;
+  sourceFile: string;
+  changedFields: string[];
+  timestamp: string;
+}
+
+/**
+ * Callback for sync events
+ */
+export type SyncEventCallback = (event: WorkItemCreatedEvent | WorkItemUpdatedEvent) => void | Promise<void>;
 
 // ============ SYNC EXECUTION TYPES ============
 

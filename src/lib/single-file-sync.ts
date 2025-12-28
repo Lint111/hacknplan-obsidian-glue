@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import { stat } from 'fs/promises';
 import path from 'path';
 import { extractFrontmatter, stripFrontmatter } from './frontmatter.js';
-import type { Pairing, CreateOperation, UpdateOperation } from '../core/types.js';
+import type { Pairing, CreateOperation, UpdateOperation, SyncEventCallback } from '../core/types.js';
 import type { SyncStateOps } from '../tools/types.js';
 import type { HacknPlanClient } from '../core/client.js';
 import { executeSyncBatch } from './sync-executor.js';
@@ -83,7 +83,8 @@ export async function syncSingleFile(
   filePath: string,
   pairing: Pairing,
   client: HacknPlanClient,
-  syncState: SyncStateOps
+  syncState: SyncStateOps,
+  onEvent?: SyncEventCallback
 ): Promise<SingleFileSyncResult> {
   const startTime = Date.now();
 
@@ -122,7 +123,8 @@ export async function syncSingleFile(
         pairing,
         client,
         syncState,
-        startTime
+        startTime,
+        onEvent
       );
     } else if (hacknplanId && syncFileState) {
       // Existing file - update operation
@@ -135,7 +137,8 @@ export async function syncSingleFile(
         pairing,
         client,
         syncState,
-        startTime
+        startTime,
+        onEvent
       );
     } else {
       // Inconsistent state - skip
@@ -201,7 +204,8 @@ async function createNewFile(
   pairing: Pairing,
   client: HacknPlanClient,
   syncState: SyncStateOps,
-  startTime: number
+  startTime: number,
+  onEvent?: SyncEventCallback
 ): Promise<SingleFileSyncResult> {
   // Determine type ID from folder mapping
   const typeId = determineTypeIdFromPath(filePath, pairing);
@@ -234,7 +238,7 @@ async function createNewFile(
     pairing.projectId,
     client,
     syncState,
-    { stopOnError: true, rollbackOnError: true }
+    { stopOnError: true, rollbackOnError: true, onEvent: onEvent }
   );
 
   if (result.errors.length > 0) {
@@ -267,7 +271,8 @@ async function updateExistingFile(
   pairing: Pairing,
   client: HacknPlanClient,
   syncState: SyncStateOps,
-  startTime: number
+  startTime: number,
+  onEvent?: SyncEventCallback
 ): Promise<SingleFileSyncResult> {
   // Resolve tag IDs
   const tagIds = resolveTagIds(tags, pairing);
@@ -288,7 +293,7 @@ async function updateExistingFile(
     pairing.projectId,
     client,
     syncState,
-    { stopOnError: true, rollbackOnError: true }
+    { stopOnError: true, rollbackOnError: true, onEvent: onEvent }
   );
 
   if (result.errors.length > 0) {

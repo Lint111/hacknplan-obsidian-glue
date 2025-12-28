@@ -303,7 +303,8 @@ describe('SyncQueue', () => {
         '/vault/Doc1.md',
         mockPairing,
         mockClient,
-        mockSyncState
+        mockSyncState,
+        undefined  // onEvent callback
       );
     });
 
